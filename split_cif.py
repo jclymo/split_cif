@@ -31,20 +31,20 @@ def extract_section(file_path, section_heading="_atom_site_occupancy"):
 
     return start_str, relevant_lines, end_str
 
-def write_new_cif(start_str, el_lines, end_str, file_path):
-    with file_path.open("w") as f_out:
-        f_out.write(start_str)
-        for line in el_lines:
-            f_out.write(line)
-        f_out.write(end_str)
-
-def split_cif(file_path, out_folder):
-    start_str, relevant_lines, end_str = extract_section(file)
+def split_cif(file_path):
+    start_str, relevant_lines, end_str = extract_section(file_path)
     el_groups = group_lines_by_element(relevant_lines)
+    new_cifs = {}
     for el, el_lines in el_groups.items():
         new_file_name = file_path.stem+'_'+el+'.cif'
-        out_file = pathlib.Path(out_folder, new_file_name)
-        write_new_cif(start_str, el_lines, end_str, out_file)
+        new_cifs[new_file_name] = start_str + ''.join(el_lines) + end_str
+    return new_cifs
+
+def write_out(new_cifs, out_folder):
+    for new_cif_path, new_cif_content in new_cifs.items():
+        out_file = pathlib.Path(out_folder, new_cif_path)
+        with out_file.open('w') as f:
+            f.write(new_cif_content)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Create single element cifs.')
@@ -65,7 +65,9 @@ if __name__ == "__main__":
                 if not os.path.exists(out_folder):
                     os.makedirs(out_folder)
 
-            split_cif(file, out_folder)
+            new_cifs = split_cif(file, out_folder)
+            write_out(new_cifs)
+         
             i += 1
 
     elif cif_path.is_file(): 
@@ -74,5 +76,6 @@ if __name__ == "__main__":
             os.makedirs(out_folder)
 
         file = cif_path
-        split_cif(file, out_folder)
+        new_cifs = split_cif(file, out_folder)
+        write_out(new_cifs)
         
