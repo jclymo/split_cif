@@ -3,6 +3,8 @@ import pathlib
 import re
 from collections import defaultdict
 import os
+from concurrent.futures import ThreadPoolExecutor
+
 
 def group_lines_by_element(lines):
     groups = defaultdict(list)
@@ -46,29 +48,27 @@ def write_out(new_cifs, out_folder):
         with out_file.open('w') as f:
             f.write(new_cif_content)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Create single element cifs.')
-    parser.add_argument('path', type=pathlib.Path)
+def main(cif_path, verbose=False):
+    def process_batch(batch_id, batch_data):
+        if verbose:
+            print(f'processing batch {batch_id}')
+        out_folder = pathlib.Path(cif_path, f'extracted_cifs_{batch_id}')
+        if not os.path.exists(out_folder):
+            os.makedirs(out_folder)
+        new_cifs = {}            
+        for file in batch_data:
+            new_cifs.update(split_cif(file))
+        write_out(new_cifs, out_folder)  
+        if verbose:
+            print(f'completed batch {batch_id}.')         
 
-    args = parser.parse_args()
-    cif_path = args.path
-    n = 0
-
+    batch_size = 500 # batched to avoid creating enormous directories which are then very slow to open
     if cif_path.is_dir():
-        i = 0
-        for file in cif_path.iterdir():
-            if not file.is_file(): continue
-            
-            if i % 500 == 0:
-                n += 1
-                out_folder = pathlib.Path(cif_path, f'extracted_cifs_{n}')
-                if not os.path.exists(out_folder):
-                    os.makedirs(out_folder)
-
-            new_cifs = split_cif(file, out_folder)
-            write_out(new_cifs)
-         
-            i += 1
+        all_files = [f for f in cif_path.iterdir() if f.is_file()]
+        batched_files = [all_files[i:i+batch_size] for i in range(0, len(all_files), batch_size)]
+        
+        with ThreadPoolExecutor() as exec:
+            exec.map(process_batch, range(len(batched_files)), batched_files)
 
     elif cif_path.is_file(): 
         out_folder = pathlib.Path(cif_path.parent, 'extracted_cifs')
@@ -76,6 +76,21 @@ if __name__ == "__main__":
             os.makedirs(out_folder)
 
         file = cif_path
-        new_cifs = split_cif(file, out_folder)
-        write_out(new_cifs)
+        new_cifs = split_cif(file)
+        write_out(new_cifs, out_folder)
         
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Create single element cifs.')
+    parser.add_argument('path', type=pathlib.Path)
+    parser.add_argument('-v', '--v', action='store_true')
+
+    args = parser.parse_args()
+    cif_path = args.path
+    verbose = args.v
+    
+    from time import time
+    start = time()
+    main(cif_path, verbose)
+    print(time() - start)
+
