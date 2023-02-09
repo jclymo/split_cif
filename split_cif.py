@@ -1,10 +1,8 @@
-import argparse
 import pathlib
 import re
 from collections import defaultdict
 import os
 from concurrent.futures import ThreadPoolExecutor
-
 
 def group_lines_by_element(lines):
     groups = defaultdict(list)
@@ -15,7 +13,7 @@ def group_lines_by_element(lines):
     return groups
     
 def extract_section(file_path, section_heading="_atom_site_occupancy"):
-    with file_path.open() as f:
+    with file_path.open(encoding="utf8") as f:
         section = 0
         start_str, relevant_lines, end_str = '', [], ''
         while line := f.readline():
@@ -45,7 +43,7 @@ def split_cif(file_path):
 def write_out(new_cifs, out_folder):
     for new_cif_path, new_cif_content in new_cifs.items():
         out_file = pathlib.Path(out_folder, new_cif_path)
-        with out_file.open('w') as f:
+        with out_file.open('w', encoding="utf8") as f:
             f.write(new_cif_content)
 
 def main(cif_path, verbose=False):
@@ -80,17 +78,5 @@ def main(cif_path, verbose=False):
         write_out(new_cifs, out_folder)
         
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Create single element cifs.')
-    parser.add_argument('path', type=pathlib.Path)
-    parser.add_argument('-v', '--v', action='store_true')
 
-    args = parser.parse_args()
-    cif_path = args.path
-    verbose = args.v
-    
-    from time import time
-    start = time()
-    main(cif_path, verbose)
-    print(time() - start)
 
